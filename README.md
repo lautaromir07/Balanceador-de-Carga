@@ -81,6 +81,13 @@ Balanaceador/
         └── diagram.png         ← Diagrama de arquitectura
 ```
 
+
+## Fichero de configuracion del .yml
+
+![alt text](image.png)
+
+
+
 ---
 
 ## 🔑 Puntos Clave
