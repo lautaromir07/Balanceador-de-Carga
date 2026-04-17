@@ -84,7 +84,8 @@ Balanaceador/
 
 ## Fichero de configuracion del .yml
 
-![alt text](image.png)
+<img width="694" height="873" alt="image" src="https://github.com/user-attachments/assets/547b91a5-742f-4bb5-8aaf-171e4d41fb14" />
+
 
 
 
