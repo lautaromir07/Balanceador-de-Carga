@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practica Alta Disponibilidad - Lautaro</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Práctica: Alta Disponibilidad con Balanceo de Carga</h1>
+            <p>Módulo ASIX - Proyecto desarrollado por Lautaro.</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- DIAGRAMA -->
+        <section class="card">
+            <h2>Arquitectura del Sistema</h2>
+            <img src="img/diagram.png" alt="Diagrama de Arquitectura Nginx" class="diagram-img">
+            <p>En este proyecto Nginx distribuye las peticiones entrantes entre dos servidores Apache internos compartiendo un mismo volumen de datos.</p>
+        </section>
+
+        <!-- CONFIGURACIÓN DE NGINX -->
+        <section class="card">
+            <h2>Configuración Nginx Activa</h2>
+            <p>Este es el archivo <code>default.conf</code> que gobierna el balanceo de carga en nuestro contenedor de Nginx:</p>
+            <pre class="code-block"><code>upstream apache_backends {
+    <span class="code-comment"># El bloque 'upstream' define al grupo de servidores backend.</span>
+    <span class="code-comment"># Usando Round Robin (por defecto), Nginx asigna las peticiones 1 a 1.</span>
+    server web_lautaro_1:80;
+    server web_lautaro_2:80;
+}
+
+server {
+    <span class="code-comment"># Escucha en el puerto 80 del contenedor Nginx</span>
+    listen 80;
+    server_name localhost;
+
+    <span class="code-comment"># Se pasan las cabeceras originales del cliente hacia los Apache</span>
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+
+    location / {
+        <span class="code-comment"># Se envía la petición equilibrada al grupo 'apache_backends'</span>
+        proxy_pass http://apache_backends;
+
+        <span class="code-comment"># Se desactiva la memoria caché para que el proxy siempre</span> 
+        <span class="code-comment"># envíe la solicitud nueva y demuestre el cambio de servidores</span>
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+        
+        <span class="code-comment"># 'X-Upstream' devuelve al Javascript qué IP interna exacta nos atendió</span>
+        add_header X-Upstream $upstream_addr always;
+        add_header X-Balancer "Alta_Disponibilidad_Lautaro" always;
+    }
+}</code></pre>
+        </section>
+
+        <!-- CONTENIDO MULTIMEDIA -->
+        <section class="card media-section">
+            <h2>Contenido Estático Compartido</h2>
+            <p>Los dos Apache sirven simultáneamente los siguientes recursos desde el volumen compartido montado:</p>
+            
+            <div class="media-grid">
+                <div>
+                    <h3>Centro de Datos</h3>
+                    <img src="img/datacenter.png" alt="Centro de Datos" class="media-asset">
+                </div>
+                <div>
+                    <h3>Video de Demostración</h3>
+                    <video controls class="media-asset">
+                        <!-- Video sample público para cumplir el requerimiento de video corto -->
+                        <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+                        Tu navegador no soporta video HTML5.
+                    </video>
+                </div>
+            </div>
+        </section>
+
+        <!-- PRUEBA DEL BALANCEADOR -->
+        <section class="card">
+            <h2>Panel de Prueba (Load Balancer)</h2>
+            <p>Pulsa el botón para enviar múltiples peticiones al balanceador. Nginx responderá qué backend procesó cada una usando la técnica Round Robin.</p>
+            
+            <div class="test-panel">
+                <div class="current-server">
+                    <span>Estás conectado actualmente a:</span>
+                    <strong id="current-server-badge">Detectando...</strong>
+                </div>
+
+                <button id="test-btn" onclick="runTest()">Ejecutar Prueba de Carga (10 peticiones)</button>
+
+                <div class="test-results" id="test-results" style="display: none;">
+                    <h3>Resultados en vivo:</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th># Petición</th>
+                                <th>Backend que respondió (IP Nginx Upstream)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                            <!-- JS inyectará resultados aquí -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>ASIX - Práctica final de Alta Disponibilidad | Creado por Lautaro (Entorno Local)</p>
+        </div>
+    </footer>
+
+    <script>
+        // Formatear y detectar nombre del servidor a partir de la IP
+        function getServerName(ip) {
+            if (!ip) return 'N/A';
+            // Diferenciar explícitamente entre el Nodo 1 y el Nodo 2 usando el final de su IP asignada
+            if (ip.includes('.2:') || ip.endsWith('.2')) {
+                return 'Nodo 1 ASIX [' + ip + ']';
+            } else if (ip.includes('.3:') || ip.endsWith('.3')) {
+                return 'Nodo 2 ASIX [' + ip + ']';
+            }
+            return 'Nodo Backend ASIX [' + ip + ']';
+        }
+
+        // Detectar el servidor que carga la página actual al entrar
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/')
+                .then(response => {
+                    const upstreamIP = response.headers.get('X-Upstream') || 'Cabecera no disponible';
+                    document.getElementById('current-server-badge').innerText = getServerName(upstreamIP);
+                })
+                .catch(() => {
+                    document.getElementById('current-server-badge').innerText = 'Servidor Local (No Nginx)';
+                });
+        });
+
+        // Función que ejecuta las 10 peticiones del test Real de balanceo
+        async function runTest() {
+            const btn = document.getElementById('test-btn');
+            const resultsDiv = document.getElementById('test-results');
+            const tbody = document.getElementById('results-body');
+            
+            btn.disabled = true;
+            btn.innerText = 'Consultando Nginx...';
+            resultsDiv.style.display = 'block';
+            tbody.innerHTML = '';
+
+            for (let i = 1; i <= 10; i++) {
+                try {
+                    // ?t= evita la caché del navegador
+                    const response = await fetch('/?t=' + Date.now() + i, { cache: 'no-store' });
+                    const upstreamIP = response.headers.get('X-Upstream') || 'N/A';
+                    const serverName = getServerName(upstreamIP);
+                    
+                    const row = document.createElement('tr');
+                    
+                    // Coloreamos la fila ligeramente. Si termina en una IP par, de un color.
+                    if (upstreamIP.includes('.2:') || upstreamIP.endsWith('.2')) row.style.backgroundColor = '#e8f5e9'; // verde suave
+                    else row.style.backgroundColor = '#e3f2fd'; // azul suave
+                    
+                    row.innerHTML = `<td>Petición GET #${i}</td><td><b>${serverName}</b></td>`;
+                    tbody.appendChild(row);
+
+                } catch (error) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td>Petición ${i}</td><td style="color:red;">Error de conexión</td>`;
+                    tbody.appendChild(row);
+                }
+                
+                // Pequeño delay de 200 ms entre cada petición para simular un proceso real y dar tiempo a renderizar la tabla
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            btn.disabled = false;
+            btn.innerText = 'Ejecutar Prueba de Carga (10 peticiones)';
+        }
+    </script>
+</body>
+</html>

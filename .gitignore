@@ -1,0 +1,14 @@
+# Ignorar todo por defecto
+*
+
+# Permitir estos archivos y carpetas específicos
+!nginx/
+!nginx/**
+!web-content/
+!web-content/**
+!docker-compose.yml
+!README.md
+!.gitignore
+
+# Ignorar metadatos de Agente Grupo para la subida final
+.antigravity/
