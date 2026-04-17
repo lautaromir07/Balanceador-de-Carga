@@ -112,3 +112,10 @@ curl -s -D - http://localhost:8080 -o NUL | findstr "X-Upstream"
 
 ---
 
+## Prueba del Balanceo en modo WEB
+
+![alt text](image-1.png)
+
+
+![alt text](image-2.png)
+
